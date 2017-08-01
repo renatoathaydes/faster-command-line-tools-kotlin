@@ -1,7 +1,5 @@
 plugins {
     id "org.jetbrains.kotlin.jvm" version "1.1.3-2"
-    id "com.athaydes.osgi-run" version "1.5.5"
-    id 'org.dm.bundle' version '0.9.0'
 }
 
 sourceCompatibility = 1.8
@@ -16,20 +14,7 @@ repositories {
 }
 
 dependencies {
-    // the osgiaas-cli core bundle
-    compile 'com.athaydes.osgiaas:osgiaas-cli-core:0.7'
-
-    // OSGi Service Component Runtime implementation
-    compile 'org.apache.felix:org.apache.felix.scr:2.0.2', {
-        exclude group: '*'
-    }
-
-    compile "org.jetbrains.kotlin:kotlin-osgi-bundle:1.1.3-2"
-    compile "org.osgi:org.osgi.service.component.annotations:1.3.0"
-}
-
-runOsgi {
-    bundles = [ project ]
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
 }
 
 compileKotlin {
@@ -40,6 +25,9 @@ compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
 }
 
-bundle {
-    instruction '-dsannotations', '*'
+task copyLibs( type: Copy ) {
+    from configurations.compile//.collect { it.isDirectory() ? it : zipTree( it ) }
+    into new File( project.buildDir, 'libs/' )
 }
+
+jar.finalizedBy copyLibs
