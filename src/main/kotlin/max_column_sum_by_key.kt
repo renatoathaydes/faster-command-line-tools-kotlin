@@ -27,26 +27,32 @@ fun main(arguments: Array<String>) {
     }
 }
 
+data class IntBox(var int: Int = 0) {
+    operator fun plus(other: Int) {
+        int += other
+    }
+}
+
 const val delim = "\t"
 
 private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val maxFieldIndex = maxOf(keyIndex, valueIndex)
-    val sumByKey = mutableMapOf<String, Int>()
+    val sumByKey = mutableMapOf<String, IntBox>()
 
     file.forEachLine { line ->
-
         @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
         val fields = (line as java.lang.String).split(delim)
 
         if (maxFieldIndex < fields.size) {
-            sumByKey.merge(fields[keyIndex], fields[valueIndex].toInt(), Int::plus)
+            sumByKey.getOrPut(fields[keyIndex]) { IntBox() } + fields[valueIndex].toInt()
         }
     }
 
     if (sumByKey.isEmpty()) {
         println("No entries")
     } else {
-        val (key, maxEntry) = sumByKey.maxBy { it.value }!!
-        println("max_key: $key, sum: $maxEntry")
+        val (key, maxEntry) = sumByKey.maxBy { it.value.int }!!
+        println("max_key: $key, sum: ${maxEntry.int}")
     }
 }
+
