@@ -27,14 +27,16 @@ fun main(arguments: Array<String>) {
     }
 }
 
-val delim = '\t'
+const val delim = "\t"
 
 private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val maxFieldIndex = maxOf(keyIndex, valueIndex)
     val sumByKey = mutableMapOf<String, Int>()
 
     file.forEachLine { line ->
-        val fields = line.split(delim)
+
+        @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+        val fields = (line as java.lang.String).split(delim)
 
         if (maxFieldIndex < fields.size) {
             sumByKey.merge(fields[keyIndex], fields[valueIndex].toInt(), Int::plus)
