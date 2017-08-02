@@ -15,6 +15,7 @@ repositories {
 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jre8:$kotlin_version"
+    compile "it.unimi.dsi:fastutil:8.1.0"
 }
 
 compileKotlin {
