@@ -1,4 +1,5 @@
 import java.io.File
+import java.util.HashMap
 
 
 fun main(arguments: Array<String>) {
@@ -37,7 +38,7 @@ const val delim = "\t"
 
 private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val maxFieldIndex = maxOf(keyIndex, valueIndex)
-    val sumByKey = mutableMapOf<String, IntBox>()
+    val sumByKey = HashMap<String, IntBox>()
 
     file.forEachLine { line ->
         @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
