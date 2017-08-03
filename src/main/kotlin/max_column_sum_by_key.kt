@@ -34,7 +34,18 @@ data class IntBox(var int: Int = 0) {
     }
 }
 
-const val delim = '\t'
+const val delim = '\t'.toByte()
+
+fun ByteArray.toIntUpTo(maxIndex: Int): Int {
+    var result = 0
+    var multiplier = 1
+    ((maxIndex - 1) downTo 0).forEach { index ->
+        val digit = this[index].toInt() - 48
+        result += digit * multiplier
+        multiplier *= 10
+    }
+    return result
+}
 
 private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val maxFieldIndex = maxOf(keyIndex, valueIndex)
@@ -44,17 +55,25 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) {
 
     val buffer = ByteArray(1024 * 1_000)
     var fieldIndex = 0
-    val currentKey = StringBuilder(12)
-    val currentVal = StringBuilder(12)
+    val currentKey = ByteArray(12)
+    val currentVal = ByteArray(12)
+    var currentKeyMaxIndex = 0
+    var currentValMaxIndex = 0
 
     fun startLine() {
-        if (currentVal.isNotEmpty()) {
-            sumByKey.getOrPut(currentKey.toString()) { IntBox() } + currentVal.toString().toInt()
+        if (currentValMaxIndex > 0) {
+            val key = String(currentKey, 0, currentKeyMaxIndex)
+            var box = sumByKey[key]
+            if (box == null) {
+                box = IntBox()
+                sumByKey[key] = box
+            }
+            box + currentVal.toIntUpTo(currentValMaxIndex)
         }
 
         fieldIndex = 0
-        currentKey.setLength(0)
-        currentVal.setLength(0)
+        currentKeyMaxIndex = 0
+        currentValMaxIndex = 0
     }
 
     inputStream.use {
@@ -66,25 +85,25 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) {
             }
 
             (0 until bytesCount).forEach { i ->
-                val char = buffer[i].toChar()
+                val byte = buffer[i]
 
                 if (fieldIndex <= maxFieldIndex) {
-                    when (char) {
+                    when (byte) {
                         delim -> {
                             fieldIndex++
                         }
-                        '\n' -> {
+                        '\n'.toByte() -> {
                             startLine()
                         }
                         else -> {
                             if (fieldIndex == keyIndex) {
-                                currentKey.append(char)
+                                currentKey[currentKeyMaxIndex++] = byte
                             } else if (fieldIndex == valueIndex) {
-                                currentVal.append(char)
+                                currentVal[currentValMaxIndex++] = byte
                             }
                         }
                     }
-                } else if (char == '\n') {
+                } else if (byte == '\n'.toByte()) {
                     startLine()
                 }
             }
