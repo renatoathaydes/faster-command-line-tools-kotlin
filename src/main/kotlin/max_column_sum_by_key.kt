@@ -1,11 +1,7 @@
-@file:Suppress("EXPERIMENTAL_FEATURE_WARNING")
-
-import kotlinx.coroutines.experimental.CommonPool
-import kotlinx.coroutines.experimental.async
-import kotlinx.coroutines.experimental.runBlocking
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.HashMap
+import java.util.concurrent.CompletableFuture
 
 fun main(arguments: Array<String>) {
     when (arguments.size) {
@@ -53,7 +49,7 @@ private fun ByteArray.toIntUpTo(maxIndex: Int): Int {
 
 const val delim = '\t'
 
-private fun run(file: File, keyIndex: Int, valueIndex: Int) = runBlocking {
+private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val maxFieldIndex = maxOf(keyIndex, valueIndex)
 
     val partition1 = RandomAccessFile(file, "r")
@@ -72,16 +68,16 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) = runBlocking {
         }
     }
 
-    val firstPartitionMaxEntry = async(CommonPool) {
+    val firstPartitionMaxEntry = CompletableFuture.supplyAsync {
         maxOfPartition(partition1, keyIndex, valueIndex, maxFieldIndex, secondPartitionStartIndex.toInt())
     }
 
-    val secondPartitionMaxEntry = async(CommonPool) {
+    val secondPartitionMaxEntry = CompletableFuture.supplyAsync {
         maxOfPartition(partition2, keyIndex, valueIndex, maxFieldIndex, fileLength.toInt())
     }
 
     val maxEntry = listOf(firstPartitionMaxEntry, secondPartitionMaxEntry)
-            .map { it.await() }
+            .map { it.join() }
             .maxBy { it.component2().int }
 
     if (maxEntry == null || maxEntry.first.isEmpty()) {
@@ -92,11 +88,11 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) = runBlocking {
     }
 }
 
-private suspend fun maxOfPartition(partition: RandomAccessFile,
-                                   keyIndex: Int,
-                                   valueIndex: Int,
-                                   maxFieldIndex: Int,
-                                   lastByteIndex: Int): Pair<String, IntBox> {
+private fun maxOfPartition(partition: RandomAccessFile,
+                           keyIndex: Int,
+                           valueIndex: Int,
+                           maxFieldIndex: Int,
+                           lastByteIndex: Int): Pair<String, IntBox> {
     val sumByKey = HashMap<String, IntBox>()
 
     val buffer = ByteArray(1024 * 1_000)
@@ -114,6 +110,8 @@ private suspend fun maxOfPartition(partition: RandomAccessFile,
         currentKey.setLength(0)
         currentValMaxIndex = 0
     }
+
+    var exitNextIteration = false
 
     while (true) {
         val bytesCount = partition.read(buffer)
@@ -147,10 +145,11 @@ private suspend fun maxOfPartition(partition: RandomAccessFile,
             }
         }
 
-        if (partition.filePointer.toInt() + buffer.size >= lastByteIndex) {
-            println("Exiting early at position ${partition.filePointer}")
+        if (exitNextIteration) {
             break // we might have read a few too many bytes, but by now we can definitely exit
         }
+
+        exitNextIteration = partition.filePointer.toInt() + buffer.size >= lastByteIndex
     }
 
     return sumByKey.maxBy { it.value.int }?.toPair() ?: ("" to IntBox())
