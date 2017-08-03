@@ -34,6 +34,18 @@ data class IntBox(var int: Int = 0) {
     }
 }
 
+private fun ByteArray.toIntUpTo(maxIndex: Int): Int {
+    var result = 0
+    var multiplier = 1
+    ((maxIndex - 1) downTo 0).forEach { index ->
+        val digit = this[index].toInt() - 48
+        result += digit * multiplier
+        multiplier *= 10
+    }
+    return result
+}
+
+
 const val delim = '\t'
 
 private fun run(file: File, keyIndex: Int, valueIndex: Int) {
@@ -45,16 +57,17 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val buffer = ByteArray(1024 * 1_000)
     var fieldIndex = 0
     val currentKey = StringBuilder(12)
-    val currentVal = StringBuilder(12)
+    val currentVal = ByteArray(12)
+    var currentValMaxIndex = 0
 
     fun startLine() {
         if (currentVal.isNotEmpty()) {
-            sumByKey.getOrPut(currentKey.toString()) { IntBox() } + currentVal.toString().toInt()
+            sumByKey.getOrPut(currentKey.toString()) { IntBox() } + currentVal.toIntUpTo(currentValMaxIndex)
         }
 
         fieldIndex = 0
         currentKey.setLength(0)
-        currentVal.setLength(0)
+        currentValMaxIndex = 0
     }
 
     inputStream.use {
@@ -66,7 +79,8 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) {
             }
 
             (0 until bytesCount).forEach { i ->
-                val char = buffer[i].toChar()
+                val byte = buffer[i]
+                val char = byte.toChar()
 
                 if (fieldIndex <= maxFieldIndex) {
                     when (char) {
@@ -80,7 +94,7 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) {
                             if (fieldIndex == keyIndex) {
                                 currentKey.append(char)
                             } else if (fieldIndex == valueIndex) {
-                                currentVal.append(char)
+                                currentVal[currentValMaxIndex++] = byte
                             }
                         }
                     }
