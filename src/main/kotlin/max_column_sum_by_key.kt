@@ -34,18 +34,60 @@ data class IntBox(var int: Int = 0) {
     }
 }
 
-const val delim = "\t"
+const val delim = '\t'
 
 private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val maxFieldIndex = maxOf(keyIndex, valueIndex)
     val sumByKey = HashMap<String, IntBox>()
 
-    file.forEachLine { line ->
-        @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
-        val fields = (line as java.lang.String).split(delim)
+    val inputStream = file.inputStream()
 
-        if (maxFieldIndex < fields.size) {
-            sumByKey.getOrPut(fields[keyIndex]) { IntBox() } + fields[valueIndex].toInt()
+    val buffer = ByteArray(1024 * 1_000)
+    var fieldIndex = 0
+    val currentKey = StringBuilder(12)
+    val currentVal = StringBuilder(12)
+
+    fun startLine() {
+        if (currentVal.isNotEmpty()) {
+            sumByKey.getOrPut(currentKey.toString()) { IntBox() } + currentVal.toString().toInt()
+        }
+
+        fieldIndex = 0
+        currentKey.setLength(0)
+        currentVal.setLength(0)
+    }
+
+    inputStream.use {
+        while (true) {
+            val bytesCount = inputStream.read(buffer)
+
+            if (bytesCount < 0) {
+                break
+            }
+
+            (0 until bytesCount).forEach { i ->
+                val char = buffer[i].toChar()
+
+                if (fieldIndex <= maxFieldIndex) {
+                    when (char) {
+                        delim -> {
+                            fieldIndex++
+                        }
+                        '\n' -> {
+                            startLine()
+                        }
+                        else -> {
+                            if (fieldIndex == keyIndex) {
+                                currentKey.append(char)
+                            } else if (fieldIndex == valueIndex) {
+                                currentVal.append(char)
+                            }
+                        }
+                    }
+                } else if (char == '\n') {
+                    startLine()
+                }
+            }
         }
     }
 
