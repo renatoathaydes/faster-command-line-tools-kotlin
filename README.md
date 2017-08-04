@@ -8,8 +8,8 @@ This is a repository with the code used in my blog post.
 
 * Java 8
 * Git
-* download the [input file](https://storage.googleapis.com/books/ngrams/books/googlebooks-eng-all-1gram-20120701-0.gz)
-  and save it under `ngrams.tsv`.
+* download the [input file](https://storage.googleapis.com/books/ngrams/books/googlebooks-eng-all-1gram-20120701-0.gz),
+  decompress it and save under `ngrams.tsv`.
 
 ### Running the benchmarks
 
