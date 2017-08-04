@@ -1,0 +1,8 @@
+x	nine	1
+x	eight	2	x	y	z
+x	two	2	a
+x	nine	3
+x	nine	3
+x	two	0
+x	nine	2	0
+x	eight	6
