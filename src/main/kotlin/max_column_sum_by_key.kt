@@ -46,6 +46,13 @@ private fun ByteArray.toIntUpTo(maxIndex: Int): Int {
     return result
 }
 
+private fun MutableMap<String, IntBox>.mergeWith(
+        other: Map<String, IntBox>): Map<String, IntBox> {
+    for ((key, value) in other) {
+        merge(key, value) { a, (int) -> a + int; a }
+    }
+    return this
+}
 
 const val delim = '\t'
 
@@ -68,23 +75,24 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) {
         }
     }
 
-    val firstPartitionMaxEntry = CompletableFuture.supplyAsync {
+    val firstPartitionResult = CompletableFuture.supplyAsync {
         maxOfPartition(partition1, keyIndex, valueIndex, maxFieldIndex, secondPartitionStartIndex.toInt())
     }
 
-    val secondPartitionMaxEntry = CompletableFuture.supplyAsync {
+    val secondPartitionResult = CompletableFuture.supplyAsync {
         maxOfPartition(partition2, keyIndex, valueIndex, maxFieldIndex, fileLength.toInt())
     }
 
-    val maxEntry = listOf(firstPartitionMaxEntry, secondPartitionMaxEntry)
-            .map { it.join() }
-            .maxBy { it.component2().int }
+    val sumByKey = firstPartitionResult.join().toMutableMap()
+            .mergeWith(secondPartitionResult.join())
 
-    if (maxEntry == null || maxEntry.first.isEmpty()) {
+    val maxEntry = sumByKey.maxBy { it.value.int }
+
+    if (maxEntry == null) {
         println("No entries")
     } else {
         val (key, value) = maxEntry
-        println("max_key: $key, sum: $value")
+        println("max_key: $key, sum: ${value.int}")
     }
 }
 
@@ -92,10 +100,10 @@ private fun maxOfPartition(partition: RandomAccessFile,
                            keyIndex: Int,
                            valueIndex: Int,
                            maxFieldIndex: Int,
-                           lastByteIndex: Int): Pair<String, IntBox> {
+                           lastByteIndex: Int): Map<String, IntBox> {
     val sumByKey = HashMap<String, IntBox>()
 
-    val buffer = ByteArray(1024 * 1_000)
+    var buffer = ByteArray(1024 * 1_000)
     var fieldIndex = 0
     val currentKey = StringBuilder(12)
     val currentVal = ByteArray(12)
@@ -111,14 +119,21 @@ private fun maxOfPartition(partition: RandomAccessFile,
         currentValMaxIndex = 0
     }
 
-    var exitNextIteration = false
+    var doneEarly = false
 
     while (true) {
-        val bytesCount = partition.read(buffer)
+        val bytesRemaining = 1 + lastByteIndex - partition.filePointer.toInt()
 
-        if (bytesCount < 0) {
+        if (bytesRemaining <= 0) {
             break
         }
+
+        if (bytesRemaining < buffer.size) {
+            buffer = ByteArray(bytesRemaining)
+            doneEarly = true
+        }
+
+        val bytesCount = partition.read(buffer)
 
         (0 until bytesCount).forEach { i ->
             val byte = buffer[i]
@@ -145,13 +160,10 @@ private fun maxOfPartition(partition: RandomAccessFile,
             }
         }
 
-        if (exitNextIteration) {
-            break // we might have read a few too many bytes, but by now we can definitely exit
+        if (doneEarly) {
+            break // partition ended
         }
-
-        exitNextIteration = partition.filePointer.toInt() + buffer.size >= lastByteIndex
     }
 
-    return sumByKey.maxBy { it.value.int }?.toPair() ?: ("" to IntBox())
+    return sumByKey
 }
-
