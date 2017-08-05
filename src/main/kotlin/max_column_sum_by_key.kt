@@ -1,7 +1,10 @@
 import java.io.File
-import java.io.RandomAccessFile
+import java.io.FileInputStream
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import java.util.HashMap
 import java.util.concurrent.CompletableFuture
+
 
 fun main(arguments: Array<String>) {
     when (arguments.size) {
@@ -54,33 +57,37 @@ private fun MutableMap<String, IntBox>.mergeWith(
     return this
 }
 
+private fun FileInputStream.mappedBytes(start: Long, size: Long): MappedByteBuffer {
+    return channel.map(FileChannel.MapMode.READ_ONLY, start, size)
+}
+
 const val delim = '\t'
 
 private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     val maxFieldIndex = maxOf(keyIndex, valueIndex)
 
-    val partition1 = RandomAccessFile(file, "r")
-    val partition2 = RandomAccessFile(file, "r")
 
     val fileLength = file.length()
     var secondPartitionStartIndex = fileLength / 2L
 
-    partition2.seek(secondPartitionStartIndex)
+    val partition2 = file.inputStream().mappedBytes(secondPartitionStartIndex, secondPartitionStartIndex)
 
     while (true) {
-        val byte = partition2.read()
+        val byte = partition2.get()
         secondPartitionStartIndex++
         if (byte < 0 || byte.toChar() == '\n') {
             break
         }
     }
 
+    val partition1 = file.inputStream().mappedBytes(0L, secondPartitionStartIndex)
+
     val firstPartitionResult = CompletableFuture.supplyAsync {
-        maxOfPartition(partition1, keyIndex, valueIndex, maxFieldIndex, secondPartitionStartIndex.toInt())
+        maxOfPartition(partition1, keyIndex, valueIndex, maxFieldIndex)
     }
 
     val secondPartitionResult = CompletableFuture.supplyAsync {
-        maxOfPartition(partition2, keyIndex, valueIndex, maxFieldIndex, fileLength.toInt())
+        maxOfPartition(partition2, keyIndex, valueIndex, maxFieldIndex)
     }
 
     val sumByKey = firstPartitionResult.join().toMutableMap()
@@ -96,14 +103,12 @@ private fun run(file: File, keyIndex: Int, valueIndex: Int) {
     }
 }
 
-private fun maxOfPartition(partition: RandomAccessFile,
+private fun maxOfPartition(partition: MappedByteBuffer,
                            keyIndex: Int,
                            valueIndex: Int,
-                           maxFieldIndex: Int,
-                           lastByteIndex: Int): Map<String, IntBox> {
+                           maxFieldIndex: Int): Map<String, IntBox> {
     val sumByKey = HashMap<String, IntBox>()
 
-    var buffer = ByteArray(1024 * 1_000)
     var fieldIndex = 0
     val currentKey = StringBuilder(12)
     val currentVal = ByteArray(12)
@@ -119,49 +124,28 @@ private fun maxOfPartition(partition: RandomAccessFile,
         currentValMaxIndex = 0
     }
 
-    var doneEarly = false
+    while (partition.hasRemaining()) {
+        val byte = partition.get()
+        val char = byte.toChar()
 
-    while (true) {
-        val bytesRemaining = 1 + lastByteIndex - partition.filePointer.toInt()
-
-        if (bytesRemaining <= 0) {
-            break
-        }
-
-        if (bytesRemaining < buffer.size) {
-            buffer = ByteArray(bytesRemaining)
-            doneEarly = true
-        }
-
-        val bytesCount = partition.read(buffer)
-
-        (0 until bytesCount).forEach { i ->
-            val byte = buffer[i]
-            val char = byte.toChar()
-
-            if (fieldIndex <= maxFieldIndex) {
-                when (char) {
-                    delim -> {
-                        fieldIndex++
-                    }
-                    '\n' -> {
-                        startLine()
-                    }
-                    else -> {
-                        if (fieldIndex == keyIndex) {
-                            currentKey.append(char)
-                        } else if (fieldIndex == valueIndex) {
-                            currentVal[currentValMaxIndex++] = byte
-                        }
+        if (fieldIndex <= maxFieldIndex) {
+            when (char) {
+                delim -> {
+                    fieldIndex++
+                }
+                '\n' -> {
+                    startLine()
+                }
+                else -> {
+                    if (fieldIndex == keyIndex) {
+                        currentKey.append(char)
+                    } else if (fieldIndex == valueIndex) {
+                        currentVal[currentValMaxIndex++] = byte
                     }
                 }
-            } else if (char == '\n') {
-                startLine()
             }
-        }
-
-        if (doneEarly) {
-            break // partition ended
+        } else if (char == '\n') {
+            startLine()
         }
     }
 
