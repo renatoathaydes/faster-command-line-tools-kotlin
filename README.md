@@ -33,6 +33,7 @@ Commits:
 * v5: d8bc248a104cad09333adb9f6b1c0986683fca0c
 * v6: e9e0d60e8ec293e32961d71e1caa77af3adacbf3
 * v7: f1983271d6b3ad5c2516e1cdf41648e446ab1d7c
+* bonus version with MappedByteBuffer: 0b305bbe64f7586badb9c9efdef296fe9c4df38c 
 
 > Notice that the versions in the commit messages got messed up. Sorry for that.
 
@@ -42,7 +43,7 @@ For example:
 git checkout b7c9e09d73093b8bf52d22db3965c7a71117fd18
 ```
 
-> Notice that `master` contains the fastest version.
+> Notice that `master` contains v7.
 
 3. Build with gradlew
 
